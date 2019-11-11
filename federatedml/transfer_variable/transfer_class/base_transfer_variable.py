@@ -27,6 +27,7 @@ class Variable(object):
         self.name = name
         self.auth = auth
         self._transfer_variable = transfer_variable
+        self._cleaner = None
 
     def remote(self, obj, role=None, idx=-1, suffix=tuple()):
         """
@@ -42,11 +43,14 @@ class Variable(object):
         """
         if not isinstance(suffix, tuple):
             suffix = (suffix, )
-        federation.remote(obj=obj,
+        cleaner = federation.remote(obj=obj,
                           name=self.name,
                           tag=self._transfer_variable.generate_transferid(self, *suffix),
                           role=role,
                           idx=idx)
+        if self._cleaner:
+            self._cleaner.clean()
+        self._cleaner = cleaner
 
     def get(self, idx=-1, suffix=tuple()):
         """

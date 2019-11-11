@@ -14,4 +14,34 @@
 #  limitations under the License.
 #
 from .transfer import FederationBuilder
-__all__ = ["FederationBuilder"]
+__all__ = ["FederationBuilder", "Cleaner"]
+
+
+class Cleaner(object):
+    def __init__(self):
+        self._tables = []
+        self._kv = {}
+
+    def add_table(self, table):
+        self._tables.append(table)
+
+    def add_obj(self, table, key):
+        if (table._name, table._namespace) not in table:
+            self._kv[(table._name, table._namespace)] = (table, [])
+        else:
+            self._kv[(table._name, table._namespace)][1].append(key)
+
+    def clean(self):
+        for table in self._tables:
+            try:
+                table.destroy()
+            except:
+                pass
+
+        for _, (table, keys) in self._kv.items():
+            for key in keys:
+                try:
+                    table.delete(key)
+                except:
+                    pass
+

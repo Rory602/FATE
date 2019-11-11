@@ -20,6 +20,7 @@ from arch.api.utils import file_utils
 from arch.api.utils.log_utils import getLogger
 import asyncio
 from arch.api import StoreType
+from arch.api.transfer import Cleaner
 
 OBJECT_STORAGE_NAME = "__federation__"
 STATUS_TABLE_NAME = "__status__"
@@ -110,6 +111,7 @@ class FederationRuntime(object):
             for _role in auth_dict.get(sub_name).get('dst'):
                 parties[_role] = self.__get_parties(_role)
 
+        cleaner = Cleaner()
         for _role, _partyIds in parties.items():
             for _partyId in _partyIds:
                 _tagged_key = self.__remote__object_key(self.job_id, name, tag, self.role, self.party_id, _role,
@@ -117,13 +119,18 @@ class FederationRuntime(object):
                 _status_table = _get_meta_table(STATUS_TABLE_NAME, self.job_id)
                 if isinstance(obj, _DTable):
                     _status_table.put(_tagged_key, (obj._type, obj._name, obj._namespace, obj._partitions))
+                    cleaner.add_table(object)
+                    cleaner.add_obj(_status_table, _tagged_key)
                 else:
-                    # object_storage_table_name = '{}.{}'.format(OBJECT_STORAGE_NAME, '-'.join([self.role, str(self.party_id), _role, str(_partyId)]))
-                    # _table = _get_meta_table(object_storage_table_name, self.job_id)
                     _table = _get_meta_table(OBJECT_STORAGE_NAME, self.job_id)
                     _table.put(_tagged_key, obj)
                     _status_table.put(_tagged_key, _tagged_key)
+                    cleaner.add_obj(_table, _tagged_key)
+                    cleaner.add_obj(_status_table, _tagged_key)
+
                 LOGGER.debug("[REMOTE] Sent {}".format(_tagged_key))
+        return cleaner
+
 
     def get(self, name, tag, idx=-1):
         algorithm, sub_name = self.__check_authorization(name, is_send=False)

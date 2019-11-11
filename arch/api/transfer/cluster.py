@@ -19,6 +19,7 @@ import concurrent
 
 import grpc
 
+from arch.api.transfer import Cleaner
 from eggroll.api.cluster.eggroll import _DTable, _EggRoll
 from arch.api.proto import federation_pb2, federation_pb2_grpc
 from eggroll.api.proto import basic_meta_pb2, storage_basic_pb2
@@ -152,6 +153,7 @@ class FederationRuntime(object):
             for _role in auth_dict.get(sub_name).get('dst'):
                 parties[_role] = self.__get_parties(_role)
 
+        cleaner = Cleaner()
         for _role, _partyIds in parties.items():
             for _partyId in _partyIds:
                 _tagged_key = self.__remote__object_key(self.job_id, name, tag, self.role, self.party_id, _role,
@@ -166,6 +168,7 @@ class FederationRuntime(object):
                     desc = federation_pb2.TransferDataDesc(transferDataType=federation_pb2.DTABLE,
                                                            storageLocator=self.__get_locator(obj),
                                                            taggedVariableName=_serdes.serialize(_tagged_key))
+                    cleaner.add_table(obj)
                 else:
                     '''
                     If it is a object, put the object in the table and send the table meta.
@@ -177,6 +180,7 @@ class FederationRuntime(object):
                     desc = federation_pb2.TransferDataDesc(transferDataType=federation_pb2.OBJECT,
                                                            storageLocator=storage_locator,
                                                            taggedVariableName=_serdes.serialize(_tagged_key))
+                    cleaner.add_obj(_table, _tagged_key)
 
                 LOGGER.debug("[REMOTE] Sending {}".format(_tagged_key))
 
@@ -185,6 +189,7 @@ class FederationRuntime(object):
                 self.stub.send(federation_pb2.TransferMeta(job=job, tag=tag, src=src, dst=dst, dataDesc=desc,
                                                            type=federation_pb2.SEND))
                 LOGGER.debug("[REMOTE] Sent {}".format(_tagged_key))
+                return cleaner
 
     def get(self, name, tag, idx=-1):
         algorithm, sub_name = self.__check_authorization(name, is_send=False)
